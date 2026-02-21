@@ -30,69 +30,69 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            script: |
-              set -e
-              set -o pipefail
+            
+            set -e
+            set -o pipefail
 
-              APP_DIR="/home/rootuser/corerouter-workers"
-              LOG_DIR="$APP_DIR/logs"
-              DEPLOY_LOG="$APP_DIR/deploy-$(date +%s).log"
+            APP_DIR="/home/rootuser/corerouter-workers"
+            LOG_DIR="$APP_DIR/logs"
+            DEPLOY_LOG="$APP_DIR/deploy-$(date +%s).log"
 
-              mkdir -p $APP_DIR
-              mkdir -p $LOG_DIR
+            mkdir -p $APP_DIR
+            mkdir -p $LOG_DIR
 
-              {
-                echo "=========================================="
-                echo "Starting CoreRouter Workers Deployment"
-                echo "=========================================="
+            {
+              echo "=========================================="
+              echo "Starting CoreRouter Workers Deployment"
+              echo "=========================================="
 
-                # ---------- CLONE OR UPDATE REPO ----------
-                if [ ! -d "$APP_DIR/.git" ]; then
-                  echo "First deployment detected. Cloning repository..."
-                  git clone https://github.com/dashivam06/corerouter-workers.git $APP_DIR
-                else
-                  echo "Repository exists. Pulling latest code..."
-                  cd $APP_DIR
-                  git fetch origin
-                  git reset --hard origin/main
-                fi
-
+              # ---------- CLONE OR UPDATE REPO ----------
+              if [ ! -d "$APP_DIR/.git" ]; then
+                echo "First deployment detected. Cloning repository..."
+                git clone https://github.com/dashivam06/corerouter-workers.git $APP_DIR
+              else
+                echo "Repository exists. Pulling latest code..."
                 cd $APP_DIR
+                git fetch origin
+                git reset --hard origin/main
+              fi
 
-                # ---------- DOCKER CLEANUP ----------
-                echo "Cleaning old images"
-                sudo docker image prune -af || true
+              cd $APP_DIR
 
-                # ---------- BUILD IMAGE ----------
-                echo "Building Docker image"
-                sudo docker build -t corerouter-workers:latest .
+              # ---------- DOCKER CLEANUP ----------
+              echo "Cleaning old images"
+              sudo docker image prune -af || true
 
-                echo ""
-                echo "========== Deploying Workers =========="
+              # ---------- BUILD IMAGE ----------
+              echo "Building Docker image"
+              sudo docker build -t corerouter-workers:latest .
 
-                # ---------- OTP WORKER ----------
-                echo "Deploying OTP Email Worker..."
+              echo ""
+              echo "========== Deploying Workers =========="
 
-                sudo docker stop otp-email-worker || true
-                sudo docker rm otp-email-worker || true
+              # ---------- OTP WORKER ----------
+              echo "Deploying OTP Email Worker..."
 
-                sudo docker run -d \
-                  --name otp-email-worker \
-                  --restart unless-stopped \
-                  -v $LOG_DIR:/app/logs \
-                  -e WORKER_CLASS=com.fleebug.workers.OtpEmailWorker \
-                  -e AZURE_COMMUNICATION_CONNECTION_STRING="${{ secrets.AZURE_COMMUNICATION_CONNECTION_STRING }}" \
-                  -e REDIS_HOST="${{ secrets.REDIS_HOST }}" \
-                  -e REDIS_PORT="${{ secrets.REDIS_PORT }}" \
-                  -e REDIS_PASSWORD="${{ secrets.REDIS_PASSWORD }}" \
-                  -e ENCRYPTION_KEY="${{ secrets.ENCRYPTION_KEY }}" \
-                  corerouter-workers:latest
+              sudo docker stop otp-email-worker || true
+              sudo docker rm otp-email-worker || true
 
-                echo "OTP Worker started"
+              sudo docker run -d \
+                --name otp-email-worker \
+                --restart unless-stopped \
+                -v $LOG_DIR:/app/logs \
+                -e WORKER_CLASS=com.fleebug.workers.OtpEmailWorker \
+                -e AZURE_COMMUNICATION_CONNECTION_STRING="${{ secrets.AZURE_COMMUNICATION_CONNECTION_STRING }}" \
+                -e REDIS_HOST="${{ secrets.REDIS_HOST }}" \
+                -e REDIS_PORT="${{ secrets.REDIS_PORT }}" \
+                -e REDIS_PASSWORD="${{ secrets.REDIS_PASSWORD }}" \
+                -e ENCRYPTION_KEY="${{ secrets.ENCRYPTION_KEY }}" \
+                corerouter-workers:latest
 
-                echo ""
-                echo "========== Deployment Complete =========="
+              echo "OTP Worker started"
 
-                sudo docker ps --filter "name=*-worker"
+              echo ""
+              echo "========== Deployment Complete =========="
 
-              } 2>&1 | tee -a $DEPLOY_LOG
+              sudo docker ps --filter "name=*-worker"
+
+            } 2>&1 | tee -a $DEPLOY_LOG
