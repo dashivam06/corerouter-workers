@@ -1,0 +1,98 @@
+name: Deploy CoreRouter Workers to VM
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build with Maven
+        run: mvn clean package -Pshade -DskipTests
+
+      - name: Execute Deployment on VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            script: |
+              set -e
+              set -o pipefail
+
+              APP_DIR="/home/rootuser/corerouter-workers"
+              LOG_DIR="$APP_DIR/logs"
+              DEPLOY_LOG="$APP_DIR/deploy-$(date +%s).log"
+
+              mkdir -p $APP_DIR
+              mkdir -p $LOG_DIR
+
+              {
+                echo "=========================================="
+                echo "Starting CoreRouter Workers Deployment"
+                echo "=========================================="
+
+                # ---------- CLONE OR UPDATE REPO ----------
+                if [ ! -d "$APP_DIR/.git" ]; then
+                  echo "First deployment detected. Cloning repository..."
+                  git clone https://github.com/YOUR_USERNAME/YOUR_REPO.git $APP_DIR
+                else
+                  echo "Repository exists. Pulling latest code..."
+                  cd $APP_DIR
+                  git fetch origin
+                  git reset --hard origin/main
+                fi
+
+                cd $APP_DIR
+
+                # ---------- DOCKER CLEANUP ----------
+                echo "Cleaning old images"
+                sudo docker image prune -af || true
+
+                # ---------- BUILD IMAGE ----------
+                echo "Building Docker image"
+                sudo docker build -t corerouter-workers:latest .
+
+                echo ""
+                echo "========== Deploying Workers =========="
+
+                # ---------- OTP WORKER ----------
+                echo "Deploying OTP Email Worker..."
+
+                sudo docker stop otp-email-worker || true
+                sudo docker rm otp-email-worker || true
+
+                sudo docker run -d \
+                  --name otp-email-worker \
+                  --restart unless-stopped \
+                  -v $LOG_DIR:/app/logs \
+                  -e WORKER_CLASS=com.fleebug.workers.OtpEmailWorker \
+                  -e AZURE_COMMUNICATION_CONNECTION_STRING="${{ secrets.AZURE_COMMUNICATION_CONNECTION_STRING }}" \
+                  -e REDIS_HOST="${{ secrets.REDIS_HOST }}" \
+                  -e REDIS_PORT="${{ secrets.REDIS_PORT }}" \
+                  -e REDIS_PASSWORD="${{ secrets.REDIS_PASSWORD }}" \
+                  -e ENCRYPTION_KEY="${{ secrets.ENCRYPTION_KEY }}" \
+                  corerouter-workers:latest
+
+                echo "OTP Worker started"
+
+                echo ""
+                echo "========== Deployment Complete =========="
+
+                sudo docker ps --filter "name=*-worker"
+
+              } 2>&1 | tee -a $DEPLOY_LOG

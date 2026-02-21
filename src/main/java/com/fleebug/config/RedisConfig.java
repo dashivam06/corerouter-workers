@@ -29,8 +29,7 @@ public class RedisConfig {
       
         int redisPort = Integer.parseInt(redisPortStr);
 
-        // jedisPool = new JedisPool(jedisPoolConfig, redisHostName, (redisPort), 2000, redisPassword);
-        jedisPool = new JedisPool(jedisPoolConfig, redisHostName, (redisPort), 2000);
+        jedisPool = new JedisPool(jedisPoolConfig, redisHostName, (redisPort), 2000, redisPassword);
 
     }
 
