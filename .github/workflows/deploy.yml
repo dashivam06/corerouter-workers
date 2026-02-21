@@ -84,6 +84,8 @@ jobs:
                 -v $LOG_DIR:/app/logs \
                 -e WORKER_CLASS=com.fleebug.workers.OtpEmailWorker \
                 -e AZURE_COMMUNICATION_CONNECTION_STRING="${{ secrets.AZURE_COMMUNICATION_CONNECTION_STRING }}" \
+                -e AZURE_COMMUNICATION_COREROUTER_ACCESS_KEY="${{ secrets.AZURE_COMMUNICATION_COREROUTER_ACCESS_KEY }}" \
+                -e AZURE_COMMUNICATION_COREROUTER_ENDPOINT="${{ secrets.AZURE_COMMUNICATION_COREROUTER_ENDPOINT }}" \
                 -e REDIS_HOST="${{ secrets.REDIS_HOST }}" \
                 -e REDIS_PORT="${{ secrets.REDIS_PORT }}" \
                 -e REDIS_PASSWORD="${{ secrets.REDIS_PASSWORD }}" \
